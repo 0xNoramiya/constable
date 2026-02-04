@@ -4,13 +4,27 @@ Constable - Recursive Token Tracker
 Track where tokens go from a starting wallet
 """
 
+import os
+import sys
 import requests
 import json
+import time
 from typing import List, Dict, Optional, Set
 from dataclasses import dataclass, asdict
 from datetime import datetime
+from dotenv import load_dotenv
 
-HELIUS_API_KEY = "YOUR_HELIUS_API_KEY_HERE"
+# Load environment variables
+load_dotenv()
+
+def log(msg: str):
+    """Log to stderr (doesn't interfere with HTTP responses)"""
+    print(msg, file=sys.stderr, flush=True)
+
+HELIUS_API_KEY = os.getenv("HELIUS_API_KEY")
+if not HELIUS_API_KEY:
+    raise ValueError("HELIUS_API_KEY environment variable is required")
+
 HELIUS_RPC = f"https://mainnet.helius-rpc.com/?api-key={HELIUS_API_KEY}"
 
 
@@ -25,159 +39,19 @@ class TokenFlow:
     signature: str
     timestamp: int
     slot: int
-    depth: int  # How many hops from source
-
-
-def fetch_token_accounts(wallet: str, token_mint: str) -> List[Dict]:
-    """Get all token accounts for a wallet holding specific token."""
-    payload = {
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "getTokenAccountsByOwner",
-        "params": [
-            wallet,
-            {"mint": token_mint},
-            {"encoding": "jsonParsed"}
-        ]
-    }
-    
-    try:
-        response = requests.post(HELIUS_RPC, json=payload, timeout=30)
-        data = response.json()
-        return data.get("result", {}).get("value", [])
-    except Exception as e:
-        print(f"Error fetching token accounts: {e}")
-        return []
-
-
-def fetch_signatures(wallet: str, limit: int = 100, before: Optional[str] = None) -> List[Dict]:
-    """Fetch transaction signatures for a wallet."""
-    params = {"limit": limit}
-    if before:
-        params["before"] = before
-        
-    payload = {
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "getSignaturesForAddress",
-        "params": [wallet, params]
-    }
-    
-    try:
-        response = requests.post(HELIUS_RPC, json=payload, timeout=30)
-        data = response.json()
-        return data.get("result", [])
-    except Exception as e:
-        print(f"Error fetching signatures: {e}")
-        return []
-
-
-def fetch_transaction(signature: str) -> Optional[Dict]:
-    """Fetch full transaction details."""
-    payload = {
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "getTransaction",
-        "params": [
-            signature,
-            {
-                "encoding": "jsonParsed",
-                "maxSupportedTransactionVersion": 0,
-                "commitment": "confirmed"
-            }
-        ]
-    }
-    
-    try:
-        response = requests.post(HELIUS_RPC, json=payload, timeout=30)
-        data = response.json()
-        return data.get("result")
-    except Exception as e:
-        print(f"Error fetching transaction: {e}")
-        return None
-
-
-def parse_token_transfers(tx: Dict, target_wallet: str, target_token: str) -> List[Dict]:
-    """
-    Parse token transfers from a transaction where target_wallet is the sender.
-    Returns list of {to, amount, token, signature}.
-    """
-    transfers = []
-    if not tx:
-        return transfers
-    
-    meta = tx.get("meta", {})
-    message = tx.get("transaction", {}).get("message", {})
-    
-    # Get pre and post token balances to find changes
-    pre_balances = {b.get("accountIndex"): b for b in meta.get("preTokenBalances", [])}
-    post_balances = {b.get("accountIndex"): b for b in meta.get("postTokenBalances", [])}
-    
-    # Map account indexes to addresses
-    account_keys = message.get("accountKeys", [])
-    
-    # Find transfers where target_wallet is sender
-    instructions = message.get("instructions", [])
-    inner_instructions = meta.get("innerInstructions", [])
-    
-    all_instructions = list(instructions)
-    for inner in inner_instructions:
-        all_instructions.extend(inner.get("instructions", []))
-    
-    for ix in all_instructions:
-        parsed = ix.get("parsed", {})
-        if parsed.get("type") == "transferChecked":
-            info = parsed.get("info", {})
-            from_acc = info.get("authority")
-            to_acc = info.get("destination")
-            token_acc = info.get("mint")
-            amount = info.get("tokenAmount", {}).get("uiAmount", 0)
-            
-            # Check if this is our target token and from our target wallet
-            if token_acc == target_token:
-                # Need to map account to wallet - this is simplified
-                transfers.append({
-                    "to": to_acc,
-                    "amount": amount,
-                    "token": token_acc,
-                    "signature": tx.get("transaction", {}).get("signatures", [""])[0],
-                    "timestamp": tx.get("blockTime", 0),
-                    "slot": tx.get("slot", 0)
-                })
-    
-    return transfers
-
-
-def get_wallet_from_token_account(token_account: str) -> Optional[str]:
-    """Get owner wallet from token account address."""
-    payload = {
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "getAccountInfo",
-        "params": [token_account, {"encoding": "jsonParsed"}]
-    }
-    
-    try:
-        response = requests.post(HELIUS_RPC, json=payload, timeout=30)
-        data = response.json()
-        account = data.get("result", {}).get("value", {})
-        parsed = account.get("data", {}).get("parsed", {}).get("info", {})
-        return parsed.get("owner")
-    except:
-        return None
+    depth: int
 
 
 def get_token_metadata(token_mint: str) -> Dict:
     """Get token symbol and name."""
     try:
-        # Try to get from Helius token metadata
         payload = {
             "jsonrpc": "2.0",
             "id": 1,
             "method": "getAsset",
             "params": {"id": token_mint}
         }
-        response = requests.post(HELIUS_RPC, json=payload, timeout=30)
+        response = requests.post(HELIUS_RPC, json=payload, timeout=10)
         data = response.json()
         result = data.get("result", {})
         return {
@@ -189,173 +63,208 @@ def get_token_metadata(token_mint: str) -> Dict:
         return {"symbol": "UNKNOWN", "name": "Unknown Token", "decimals": 9}
 
 
+def get_token_accounts(wallet: str, token_mint: str) -> List[Dict]:
+    """Get token accounts for a wallet."""
+    payload = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "getTokenAccountsByOwner",
+        "params": [wallet, {"mint": token_mint}, {"encoding": "jsonParsed"}]
+    }
+    try:
+        response = requests.post(HELIUS_RPC, json=payload, timeout=10)
+        return response.json().get("result", {}).get("value", [])
+    except:
+        return []
+
+
+def fetch_signatures(wallet: str, limit: int = 20) -> List[Dict]:
+    """Fetch transaction signatures for a wallet."""
+    payload = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "getSignaturesForAddress",
+        "params": [wallet, {"limit": limit}]
+    }
+    try:
+        response = requests.post(HELIUS_RPC, json=payload, timeout=15)
+        return response.json().get("result", [])
+    except:
+        return []
+
+
+def fetch_transactions_batch(signatures: List[str]) -> List[Optional[Dict]]:
+    """Fetch multiple transactions in a batch request."""
+    if not signatures:
+        return []
+    
+    # Build batch request
+    batch = []
+    for i, sig in enumerate(signatures[:10]):  # Limit to 10 per batch
+        batch.append({
+            "jsonrpc": "2.0",
+            "id": i,
+            "method": "getTransaction",
+            "params": [sig, {"encoding": "jsonParsed", "maxSupportedTransactionVersion": 0}]
+        })
+    
+    try:
+        response = requests.post(HELIUS_RPC, json=batch, timeout=30)
+        results = response.json()
+        return [r.get("result") for r in results if r.get("result")]
+    except Exception as e:
+        log(f"Batch fetch error: {e}")
+        return []
+
+
+def parse_flows_from_transactions(
+    transactions: List[Dict],
+    source_wallet: str,
+    token_mint: str,
+    token_symbol: str
+) -> List[Dict]:
+    """Extract token flows from transactions where source_wallet is sender."""
+    flows = []
+    
+    for tx in transactions:
+        if not tx:
+            continue
+            
+        meta = tx.get("meta", {})
+        pre_balances = meta.get("preTokenBalances", [])
+        post_balances = meta.get("postTokenBalances", [])
+        account_keys = tx.get("transaction", {}).get("message", {}).get("accountKeys", [])
+        sig = tx.get("transaction", {}).get("signatures", [""])[0]
+        block_time = tx.get("blockTime", 0)
+        slot = tx.get("slot", 0)
+        
+        # Find source wallet's token account
+        source_accounts = []
+        for pre in pre_balances:
+            if pre.get("mint") != token_mint:
+                continue
+            account_idx = pre.get("accountIndex")
+            if account_idx < len(account_keys):
+                source_accounts.append({
+                    "idx": account_idx,
+                    "pre": float(pre.get("uiTokenAmount", {}).get("uiAmount", 0) or 0)
+                })
+        
+        # Check each source account for outgoing transfers
+        for src in source_accounts:
+            post_amt = 0
+            for post in post_balances:
+                if post.get("accountIndex") == src["idx"] and post.get("mint") == token_mint:
+                    post_amt = float(post.get("uiTokenAmount", {}).get("uiAmount", 0) or 0)
+                    break
+            
+            if post_amt < src["pre"] and src["pre"] > 0:
+                amount_sent = src["pre"] - post_amt
+                
+                # Find recipients
+                for post in post_balances:
+                    if post.get("mint") != token_mint:
+                        continue
+                    
+                    post_idx = post.get("accountIndex")
+                    if post_idx >= len(account_keys) or post_idx == src["idx"]:
+                        continue
+                    
+                    post_amt_new = float(post.get("uiTokenAmount", {}).get("uiAmount", 0) or 0)
+                    
+                    # Check if balance increased
+                    pre_amt_old = 0
+                    for p in pre_balances:
+                        if p.get("accountIndex") == post_idx and p.get("mint") == token_mint:
+                            pre_amt_old = float(p.get("uiTokenAmount", {}).get("uiAmount", 0) or 0)
+                            break
+                    
+                    if post_amt_new > pre_amt_old:
+                        to_wallet = account_keys[post_idx].get("pubkey")
+                        if to_wallet and to_wallet != source_wallet:
+                            flows.append({
+                                "from": source_wallet,
+                                "to": to_wallet,
+                                "amount": amount_sent,
+                                "signature": sig,
+                                "timestamp": block_time,
+                                "slot": slot
+                            })
+    
+    return flows
+
+
 def track_token_recursive(
     start_wallet: str,
     token_mint: str,
     max_depth: int = 3,
-    max_tx_per_level: int = 20,  # Reduced from 50
     visited_wallets: Optional[Set[str]] = None,
     current_depth: int = 0
 ) -> List[TokenFlow]:
-    """
-    Recursively track where tokens flow from a starting wallet.
-    
-    Args:
-        start_wallet: Starting wallet address
-        token_mint: Token mint to track
-        max_depth: How many hops to follow (default 3)
-        max_tx_per_level: Max transactions to check per wallet
-        visited_wallets: Set of already visited wallets (for recursion)
-        current_depth: Current recursion depth
-    
-    Returns:
-        List of TokenFlow representing the complete flow tree
-    """
+    """Recursively track where tokens flow from a starting wallet."""
     if visited_wallets is None:
         visited_wallets = set()
     
     start_wallet = start_wallet.strip()
     token_mint = token_mint.strip()
     
-    # Prevent cycles
-    if start_wallet in visited_wallets:
+    if start_wallet in visited_wallets or current_depth >= max_depth:
         return []
     
     visited_wallets.add(start_wallet)
-    
-    # Stop if max depth reached
-    if current_depth >= max_depth:
-        return []
-    
     flows = []
     
-    # Get token metadata on first call
     token_info = get_token_metadata(token_mint)
     token_symbol = token_info.get("symbol", "UNKNOWN")
     
-    print(f"{'  ' * current_depth}🔍 Depth {current_depth}: Checking {start_wallet[:20]}...")
+    log(f"{'  ' * current_depth}🔍 Depth {current_depth}: {start_wallet[:20]}...")
     
-    # Fetch recent transactions for this wallet
-    signatures = fetch_signatures(start_wallet, max_tx_per_level)
+    # Fetch signatures
+    signatures_data = fetch_signatures(start_wallet, limit=15)
+    signatures = [s.get("signature") for s in signatures_data if s.get("signature")]
     
-    for sig_info in signatures:
-        sig = sig_info.get("signature")
-        if not sig:
-            continue
-        
-        # Fetch transaction details
-        tx = fetch_transaction(sig)
-        if not tx:
-            continue
-        
-        # Parse token transfers from this wallet
-        # Look for token balance changes in postTokenBalances
-        meta = tx.get("meta", {})
-        pre_balances = meta.get("preTokenBalances", [])
-        post_balances = meta.get("postTokenBalances", [])
-        
-        # Find our token in the balances
-        account_keys = tx.get("transaction", {}).get("message", {}).get("accountKeys", [])
-        
-        # Build balance change map
-        for pre in pre_balances:
-            if pre.get("mint") != token_mint:
-                continue
-            
-            account_idx = pre.get("accountIndex")
-            if account_idx >= len(account_keys):
-                continue
-                
-            account = account_keys[account_idx].get("pubkey")
-            
-            # Find matching post balance
-            pre_amount = float(pre.get("uiTokenAmount", {}).get("uiAmount", 0) or 0)
-            post_amount = 0
-            
-            for post in post_balances:
-                if post.get("accountIndex") == account_idx and post.get("mint") == token_mint:
-                    post_amount = float(post.get("uiTokenAmount", {}).get("uiAmount", 0) or 0)
-                    break
-            
-            # If balance decreased, tokens were sent
-            if post_amount < pre_amount and pre_amount > 0:
-                amount_sent = pre_amount - post_amount
-                
-                # Find where they went - look for accounts that gained balance
-                for post in post_balances:
-                    if post.get("mint") != token_mint:
-                        continue
-                    
-                    post_idx = post.get("accountIndex")
-                    if post_idx >= len(account_keys):
-                        continue
-                    
-                    post_account = account_keys[post_idx].get("pubkey")
-                    post_amt = float(post.get("uiTokenAmount", {}).get("uiAmount", 0) or 0)
-                    
-                    # Check if this account gained balance
-                    pre_amt = 0
-                    for p in pre_balances:
-                        if p.get("accountIndex") == post_idx and p.get("mint") == token_mint:
-                            pre_amt = float(p.get("uiTokenAmount", {}).get("uiAmount", 0) or 0)
-                            break
-                    
-                    if post_amt > pre_amt:
-                        # This account received tokens - get owner wallet
-                        to_wallet = get_wallet_from_token_account(post_account)
-                        if to_wallet and to_wallet != start_wallet:
-                            # Create flow record
-                            flow = TokenFlow(
-                                from_wallet=start_wallet,
-                                to_wallet=to_wallet,
-                                amount=amount_sent,
-                                token_mint=token_mint,
-                                token_symbol=token_symbol,
-                                signature=sig,
-                                timestamp=tx.get("blockTime", 0),
-                                slot=tx.get("slot", 0),
-                                depth=current_depth
-                            )
-                            flows.append(flow)
-                            
-                            print(f"{'  ' * current_depth}  ↳ {amount_sent:.4f} {token_symbol} → {to_wallet[:20]}...")
-                            
-                            # Recursively track from recipient
-                            sub_flows = track_token_recursive(
-                                to_wallet,
-                                token_mint,
-                                max_depth,
-                                max_tx_per_level,
-                                visited_wallets,
-                                current_depth + 1
-                            )
-                            flows.extend(sub_flows)
+    if not signatures:
+        return []
+    
+    # Small delay
+    time.sleep(0.05)
+    
+    # Batch fetch transactions
+    transactions = fetch_transactions_batch(signatures)
+    
+    # Parse flows
+    raw_flows = parse_flows_from_transactions(transactions, start_wallet, token_mint, token_symbol)
+    
+    # Create flow objects and collect unique recipients
+    recipients = {}
+    for f in raw_flows:
+        flow = TokenFlow(
+            from_wallet=f["from"],
+            to_wallet=f["to"],
+            amount=f["amount"],
+            token_mint=token_mint,
+            token_symbol=token_symbol,
+            signature=f["signature"],
+            timestamp=f["timestamp"],
+            slot=f["slot"],
+            depth=current_depth
+        )
+        flows.append(flow)
+        recipients[f["to"]] = recipients.get(f["to"], 0) + f["amount"]
+        log(f"{'  ' * current_depth}  ↳ {f['amount']:.4f} {token_symbol} → {f['to'][:20]}...")
+    
+    # Sort recipients by amount and limit
+    sorted_recipients = sorted(recipients.items(), key=lambda x: x[1], reverse=True)[:3]
+    
+    # Recurse on top recipients
+    for recipient, amount in sorted_recipients:
+        time.sleep(0.1)
+        sub_flows = track_token_recursive(
+            recipient, token_mint, max_depth, visited_wallets, current_depth + 1
+        )
+        flows.extend(sub_flows)
     
     return flows
-
-
-def export_to_csv(flows: List[TokenFlow], filename: str = "token_flows.csv"):
-    """Export flows to CSV."""
-    import csv
-    
-    if not flows:
-        print("No flows to export")
-        return
-    
-    with open(filename, 'w', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=[
-            'depth', 'from_wallet', 'to_wallet', 'amount', 
-            'token_symbol', 'token_mint', 'signature', 
-            'timestamp', 'datetime', 'slot'
-        ])
-        writer.writeheader()
-        
-        for flow in flows:
-            row = asdict(flow)
-            row['datetime'] = datetime.fromtimestamp(flow.timestamp).isoformat()
-            writer.writerow(row)
-    
-    print(f"✅ Exported {len(flows)} flows to {filename}")
 
 
 def summarize_flows(flows: List[TokenFlow]) -> Dict:
@@ -400,14 +309,14 @@ def api_track():
         
     wallet = data.get('wallet', '').strip()
     token = data.get('token', '').strip()
-    max_depth = min(data.get('maxDepth', 3), 5)  # Cap at 5 for safety
+    max_depth = min(data.get('maxDepth', 2), 4)
     
     if not wallet or not token:
         return jsonify({"error": "Wallet and token mint required"}), 400
     
     try:
-        print(f"🎯 Starting trace: {wallet[:20]}... → {token[:20]}...")
-        flows = track_token_recursive(wallet, token, max_depth=max_depth, max_tx_per_level=20)
+        log(f"🎯 Starting trace: {wallet[:20]}... → {token[:20]}...")
+        flows = track_token_recursive(wallet, token, max_depth=max_depth)
         summary = summarize_flows(flows)
         
         return jsonify({
@@ -423,7 +332,7 @@ def api_track():
         return jsonify({"error": f"API request failed: {str(e)}"}), 502
     except Exception as e:
         import traceback
-        print(f"Error in api_track: {traceback.format_exc()}")
+        log(f"Error: {traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
 
 
@@ -436,10 +345,9 @@ if __name__ == "__main__":
     import sys
     
     if len(sys.argv) >= 3:
-        # CLI mode
         wallet = sys.argv[1]
         token = sys.argv[2]
-        depth = int(sys.argv[3]) if len(sys.argv) > 3 else 3
+        depth = int(sys.argv[3]) if len(sys.argv) > 3 else 2
         
         print(f"🎩 Constable - Recursive Token Tracker")
         print(f"=" * 50)
@@ -452,10 +360,6 @@ if __name__ == "__main__":
         print(f"   Wallets touched: {summary['unique_wallets']}")
         print(f"   Total {summary['token_symbol']}: {summary['total_amount']:.4f}")
         print(f"   Max depth reached: {summary['max_depth']}")
-        
-        if flows:
-            export_to_csv(flows)
     else:
-        # Server mode
         print("🎩 Constable API starting on http://localhost:5000")
         app.run(host='0.0.0.0', port=5000, debug=True)
