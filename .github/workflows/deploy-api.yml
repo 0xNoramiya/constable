@@ -1,0 +1,199 @@
+name: Deploy API
+
+# This is a deployment workflow stub for The Constable API.
+# It serves as a template and documentation for deploying to various platforms.
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'api/**'
+      - 'sdk/**'
+      - '.github/workflows/deploy-api.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+jobs:
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Build SDK
+        working-directory: sdk
+        run: |
+          npm ci
+          npm run build
+
+      - name: Build API
+        working-directory: api
+        run: |
+          npm ci
+          npm run build
+
+  # =============================================================================
+  # DEPLOYMENT OPTIONS - Uncomment and configure the platform you want to use
+  # =============================================================================
+
+  # -----------------------------------------------------------------------------
+  # Option 1: Deploy to Fly.io
+  # -----------------------------------------------------------------------------
+  # Requirements:
+  #   - flyctl installed locally: curl -L https://fly.io/install.sh | sh
+  #   - Run: fly auth signup (or fly auth login)
+  #   - Run: fly launch --no-deploy (creates fly.toml and app)
+  #   - Set GitHub secret: FLY_API_TOKEN (from fly auth token)
+  # -----------------------------------------------------------------------------
+  # deploy-flyio:
+  #   name: Deploy to Fly.io
+  #   needs: build-and-test
+  #   runs-on: ubuntu-latest
+  #   if: github.ref == 'refs/heads/main'
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v4
+  #
+  #     - name: Setup Fly.io CLI
+  #       uses: superfly/flyctl-actions/setup-flyctl@master
+  #
+  #     - name: Deploy to Fly.io
+  #       working-directory: api
+  #       run: flyctl deploy --remote-only
+  #       env:
+  #         FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+  # -----------------------------------------------------------------------------
+  # Option 2: Deploy to Railway
+  # -----------------------------------------------------------------------------
+  # Requirements:
+  #   - Railway CLI: npm install -g @railway/cli
+  #   - Run: railway login
+  #   - Run: railway init (in api/ directory)
+  #   - Set GitHub secret: RAILWAY_TOKEN (from railway token)
+  # -----------------------------------------------------------------------------
+  # deploy-railway:
+  #   name: Deploy to Railway
+  #   needs: build-and-test
+  #   runs-on: ubuntu-latest
+  #   if: github.ref == 'refs/heads/main'
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v4
+  #
+  #     - name: Install Railway CLI
+  #       run: npm install -g @railway/cli
+  #
+  #     - name: Deploy to Railway
+  #       working-directory: api
+  #       run: railway up --service constable-api
+  #       env:
+  #         RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+  # -----------------------------------------------------------------------------
+  # Option 3: Deploy to VPS via SSH
+  # -----------------------------------------------------------------------------
+  # Requirements:
+  #   - Set GitHub secrets:
+  #     - VPS_HOST: Your server IP or hostname
+  #     - VPS_USERNAME: SSH username
+  #     - VPS_SSH_KEY: Private SSH key (cat ~/.ssh/id_rsa | base64)
+  #   - Docker and Docker Compose installed on VPS
+  # -----------------------------------------------------------------------------
+  # deploy-vps:
+  #   name: Deploy to VPS
+  #   needs: build-and-test
+  #   runs-on: ubuntu-latest
+  #   if: github.ref == 'refs/heads/main'
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v4
+  #
+  #     - name: Setup SSH key
+  #       run: |
+  #         mkdir -p ~/.ssh
+  #         echo "${{ secrets.VPS_SSH_KEY }}" | base64 -d > ~/.ssh/deploy_key
+  #         chmod 600 ~/.ssh/deploy_key
+  #         ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+  #
+  #     - name: Deploy to VPS
+  #       run: |
+  #         ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }} << 'EOF'
+  #           cd /opt/constable/api
+  #           git pull origin main
+  #           npm ci
+  #           npm run build
+  #           # Restart using PM2, systemd, or Docker
+  #           pm2 restart constable-api || systemctl restart constable-api
+  #         EOF
+
+  # -----------------------------------------------------------------------------
+  # Option 4: Deploy to AWS (ECS/Fargate)
+  # -----------------------------------------------------------------------------
+  # Requirements:
+  #   - Set GitHub secrets:
+  #     - AWS_ACCESS_KEY_ID
+  #     - AWS_SECRET_ACCESS_KEY
+  #     - AWS_REGION
+  # -----------------------------------------------------------------------------
+  # deploy-aws:
+  #   name: Deploy to AWS
+  #   needs: build-and-test
+  #   runs-on: ubuntu-latest
+  #   if: github.ref == 'refs/heads/main'
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v4
+  #
+  #     - name: Configure AWS credentials
+  #       uses: aws-actions/configure-aws-credentials@v4
+  #       with:
+  #         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  #         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  #         aws-region: ${{ secrets.AWS_REGION }}
+  #
+  #     - name: Login to Amazon ECR
+  #       id: login-ecr
+  #       uses: aws-actions/amazon-ecr-login@v2
+  #
+  #     - name: Build and push Docker image
+  #       working-directory: api
+  #       run: |
+  #         docker build -t constable-api .
+  #         docker tag constable-api:latest ${{ steps.login-ecr.outputs.registry }}/constable-api:latest
+  #         docker push ${{ steps.login-ecr.outputs.registry }}/constable-api:latest
+
+# =================================================================================
+# SETUP CHECKLIST
+# =================================================================================
+# 1. Create a Dockerfile in api/ directory (see example below)
+# 2. Choose your deployment platform above
+# 3. Uncomment the relevant job section
+# 4. Add required secrets to GitHub repository settings (Settings > Secrets > Actions)
+# 5. Update any hardcoded values (service names, paths, etc.)
+#
+# Example api/Dockerfile:
+# ---------------------------------------------------------------------------------
+# FROM node:20-alpine
+# WORKDIR /app
+# COPY package*.json ./
+# RUN npm ci --only=production
+# COPY dist/ ./dist/
+# EXPOSE 3000
+# CMD ["node", "dist/index.js"]
+# =================================================================================

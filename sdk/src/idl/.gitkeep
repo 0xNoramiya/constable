@@ -1,0 +1,10 @@
+// This file is a placeholder for the generated IDL
+// Run `anchor build` and `make copy-idl` to generate the actual IDL files
+//
+// Files that will be copied here:
+// - evidence_vault.json (IDL)
+// - evidence_vault.ts (TypeScript types)
+//
+// See docs/IDL_GENERATION.md for more information
+
+export {};

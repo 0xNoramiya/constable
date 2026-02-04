@@ -3,17 +3,41 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-evidence_vault = "Fg6tV..."
+evidence_vault = "Fg6tVimZ4BRL1P8dWNFxDGWKdfnw3hH7VzMBz5v4RZJx"
+
+[programs.devnet]
+evidence_vault = "Fg6tVimZ4BRL1P8dWNFxDGWKdfnw3hH7VzMBz5v4RZJx"
+
+[programs.mainnet]
+evidence_vault = "Fg6tVimZ4BRL1P8dWNFxDGWKdfnw3hH7VzMBz5v4RZJx"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "Localnet"
+cluster = "localnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+build = "anchor build"
+deploy-devnet = "anchor deploy --provider.cluster devnet"
+deploy-mainnet = "anchor deploy --provider.cluster mainnet"
+verify = "anchor verify --provider.cluster mainnet"
+copy-idl = "mkdir -p ../sdk/src/idl && cp target/idl/evidence_vault.json ../sdk/src/idl/ && cp target/types/evidence_vault.ts ../sdk/src/idl/"
 
 [toolchain]
 anchor_version = "0.29.0"
+
+# Cluster-specific provider configurations
+[provider.localnet]
+cluster = "localnet"
+wallet = "~/.config/solana/id.json"
+
+[provider.devnet]
+cluster = "devnet"
+wallet = "~/.config/solana/id.json"
+
+[provider.mainnet]
+cluster = "mainnet"
+wallet = "~/.config/solana/id.json"

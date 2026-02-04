@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+  # Local Solana Validator
+  solana-validator:
+    image: solanalabs/solana:v1.17.0
+    container_name: constable-solana
+    ports:
+      - "8899:8899"   # RPC endpoint
+      - "8900:8900"   # WebSocket
+    command: >
+      solana-test-validator
+      --reset
+      --rpc-port 8899
+      --ws-port 8900
+      --ledger /ledger
+      --mint 7BgBvyjrZX1YKc4rGZkNq3N2G4JEYjj7JjWfH5zRtXRG
+    volumes:
+      - solana-ledger:/ledger
+    healthcheck:
+      test: ["CMD", "solana", "cluster-version", "-u", "http://localhost:8899"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+    networks:
+      - constable-network
+
+  # API Server
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: constable-api
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - SOLANA_RPC=http://solana-validator:8899
+      - ANCHOR_PROVIDER_URL=http://solana-validator:8899
+    env_file:
+      - .env
+    volumes:
+      - ./api:/app
+      - /app/node_modules
+      - ./sdk:/app/sdk
+    depends_on:
+      solana-validator:
+        condition: service_healthy
+    command: npm run dev
+    networks:
+      - constable-network
+
+  # Frontend (optional - can also run locally for better dev experience)
+  # frontend:
+  #   build:
+  #     context: ./frontend
+  #     dockerfile: Dockerfile
+  #   container_name: constable-frontend
+  #   ports:
+  #     - "3001:3000"
+  #   environment:
+  #     - NEXT_PUBLIC_API_URL=http://localhost:3000
+  #   env_file:
+  #     - .env
+  #   volumes:
+  #     - ./frontend:/app
+  #     - /app/node_modules
+  #   depends_on:
+  #     - api
+  #   command: npm run dev
+  #   networks:
+  #     - constable-network
+
+volumes:
+  solana-ledger:
+
+networks:
+  constable-network:
+    driver: bridge

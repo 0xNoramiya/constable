@@ -1,0 +1,85 @@
+version: 2
+
+updates:
+  # Node.js dependencies for API
+  - package-ecosystem: "npm"
+    directory: "/api"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    versioning-strategy: increase
+    commit-message:
+      prefix: "chore(api)"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "api"
+    reviewers:
+      - "@constable-check/maintainers"
+
+  # Node.js dependencies for SDK
+  - package-ecosystem: "npm"
+    directory: "/sdk"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    versioning-strategy: increase
+    commit-message:
+      prefix: "chore(sdk)"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "sdk"
+    reviewers:
+      - "@constable-check/maintainers"
+
+  # Node.js dependencies for Frontend
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    versioning-strategy: increase
+    commit-message:
+      prefix: "chore(frontend)"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "frontend"
+    reviewers:
+      - "@constable-check/maintainers"
+
+  # Rust dependencies for Anchor programs
+  - package-ecosystem: "cargo"
+    directory: "/anchor/programs/evidence_vault"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "chore(anchor)"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "anchor"
+    reviewers:
+      - "@constable-check/maintainers"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "chore(ci)"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "ci"
+    reviewers:
+      - "@constable-check/maintainers"

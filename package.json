@@ -1,0 +1,32 @@
+{
+  "name": "@constable/workspace",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The Constable - On-chain forensics and investigation toolkit for Solana",
+  "workspaces": [
+    "api",
+    "sdk",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently 'npm run dev -w api' 'npm run dev -w frontend'",
+    "build": "npm run build -w sdk && npm run build -w api && npm run build -w frontend",
+    "test": "npm run test -w anchor && npm test -w sdk",
+    "lint": "eslint . --ext .ts,.tsx",
+    "postinstall": "npm run build -w sdk",
+    "anchor:build": "cd anchor && anchor build",
+    "anchor:test": "cd anchor && anchor test",
+    "anchor:deploy": "cd anchor && anchor deploy",
+    "anchor:localnet": "cd anchor && anchor localnet"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "eslint": "^8.57.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "license": "MIT"
+}
