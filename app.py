@@ -27,6 +27,19 @@ if not HELIUS_API_KEY:
 
 HELIUS_RPC = f"https://mainnet.helius-rpc.com/?api-key={HELIUS_API_KEY}"
 
+# Rate limiting: track last request time
+_last_request_time = 0
+MIN_REQUEST_INTERVAL = 0.5  # 500ms between requests (2 req/sec)
+
+def rate_limited_post(url, **kwargs):
+    """Make a rate-limited POST request."""
+    global _last_request_time
+    elapsed = time.time() - _last_request_time
+    if elapsed < MIN_REQUEST_INTERVAL:
+        time.sleep(MIN_REQUEST_INTERVAL - elapsed)
+    _last_request_time = time.time()
+    return requests.post(url, **kwargs)
+
 
 @dataclass
 class TokenFlow:
@@ -51,7 +64,7 @@ def get_token_metadata(token_mint: str) -> Dict:
             "method": "getAsset",
             "params": {"id": token_mint}
         }
-        response = requests.post(HELIUS_RPC, json=payload, timeout=10)
+        response = rate_limited_post(HELIUS_RPC, json=payload, timeout=10)
         data = response.json()
         result = data.get("result", {})
         return {
@@ -72,7 +85,7 @@ def get_token_accounts(wallet: str, token_mint: str) -> List[Dict]:
         "params": [wallet, {"mint": token_mint}, {"encoding": "jsonParsed"}]
     }
     try:
-        response = requests.post(HELIUS_RPC, json=payload, timeout=10)
+        response = rate_limited_post(HELIUS_RPC, json=payload, timeout=10)
         return response.json().get("result", {}).get("value", [])
     except:
         return []
@@ -87,7 +100,7 @@ def fetch_signatures(wallet: str, limit: int = 20) -> List[Dict]:
         "params": [wallet, {"limit": limit}]
     }
     try:
-        response = requests.post(HELIUS_RPC, json=payload, timeout=15)
+        response = rate_limited_post(HELIUS_RPC, json=payload, timeout=15)
         return response.json().get("result", [])
     except:
         return []
@@ -109,7 +122,7 @@ def fetch_transactions_batch(signatures: List[str]) -> List[Optional[Dict]]:
         })
     
     try:
-        response = requests.post(HELIUS_RPC, json=batch, timeout=30)
+        response = rate_limited_post(HELIUS_RPC, json=batch, timeout=30)
         results = response.json()
         # Handle both list (batch response) and dict (error response)
         if isinstance(results, dict):
