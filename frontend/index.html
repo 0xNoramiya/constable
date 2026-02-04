@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Constable — Token Tracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #111118;
+            --bg-tertiary: #1a1a24;
+            --accent-purple: #8b5cf6;
+            --accent-cyan: #06b6d4;
+            --accent-green: #10b981;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --border: rgba(148, 163, 184, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 60px 24px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        .logo {
+            font-size: 3rem;
+            margin-bottom: 12px;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 12px;
+        }
+
+        .tagline {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+
+        .card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 32px;
+            margin-bottom: 24px;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr auto;
+            gap: 16px;
+            align-items: end;
+        }
+
+        @media (max-width: 768px) {
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        input, select {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px 18px;
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--accent-purple);
+            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+        }
+
+        input::placeholder {
+            color: var(--text-muted);
+        }
+
+        button {
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-cyan));
+            border: none;
+            border-radius: 12px;
+            padding: 14px 32px;
+            color: white;
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            height: fit-content;
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(139, 92, 246, 0.3);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 60px 20px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid var(--bg-tertiary);
+            border-top-color: var(--accent-purple);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 24px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .results {
+            display: none;
+        }
+
+        .results.active {
+            display: block;
+        }
+
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        @media (max-width: 768px) {
+            .stats-bar {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        .stat {
+            background: var(--bg-tertiary);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--accent-cyan);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .flow-tree {
+            background: var(--bg-tertiary);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .flow-header {
+            display: grid;
+            grid-template-columns: 60px 1fr 1fr 120px 100px;
+            gap: 16px;
+            padding: 16px 24px;
+            background: rgba(139, 92, 246, 0.1);
+            border-bottom: 1px solid var(--border);
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+        }
+
+        @media (max-width: 768px) {
+            .flow-header {
+                display: none;
+            }
+        }
+
+        .flow-row {
+            display: grid;
+            grid-template-columns: 60px 1fr 1fr 120px 100px;
+            gap: 16px;
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--border);
+            align-items: center;
+            transition: background 0.15s;
+        }
+
+        .flow-row:hover {
+            background: rgba(139, 92, 246, 0.05);
+        }
+
+        .flow-row:last-child {
+            border-bottom: none;
+        }
+
+        @media (max-width: 768px) {
+            .flow-row {
+                grid-template-columns: 1fr;
+                gap: 8px;
+            }
+            
+            .flow-row > *::before {
+                content: attr(data-label);
+                font-size: 0.75rem;
+                color: var(--text-muted);
+                text-transform: uppercase;
+                display: block;
+                margin-bottom: 2px;
+            }
+        }
+
+        .depth-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+
+        .depth-0 { background: rgba(139, 92, 246, 0.2); color: var(--accent-purple); }
+        .depth-1 { background: rgba(6, 182, 212, 0.2); color: var(--accent-cyan); }
+        .depth-2 { background: rgba(16, 185, 129, 0.2); color: var(--accent-green); }
+        .depth-3 { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+
+        .wallet {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+        }
+
+        .wallet a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: color 0.15s;
+        }
+
+        .wallet a:hover {
+            color: var(--accent-cyan);
+        }
+
+        .amount {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            color: var(--accent-green);
+        }
+
+        .tx-link {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            color: var(--accent-purple);
+            text-decoration: none;
+        }
+
+        .tx-link:hover {
+            text-decoration: underline;
+        }
+
+        .tree-line {
+            position: relative;
+        }
+
+        .tree-line::before {
+            content: '';
+            position: absolute;
+            left: -20px;
+            top: -50%;
+            bottom: 50%;
+            width: 2px;
+            background: var(--border);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+
+        .error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #ef4444;
+            padding: 16px 20px;
+            border-radius: 12px;
+            margin-top: 16px;
+        }
+
+        .download-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 24px;
+            padding: 12px 24px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            font-weight: 500;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+
+        .download-btn:hover {
+            background: var(--accent-purple);
+            border-color: var(--accent-purple);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">🎩</div>
+            <h1>Constable</h1>
+            <p class="tagline">Trace where your tokens go. Recursive flow tracking for Solana.</p>
+        </header>
+
+        <div class="card">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Starting Wallet</label>
+                    <input type="text" id="wallet" placeholder="7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU">
+                </div>
+                <div class="form-group">
+                    <label>Token Mint</label>
+                    <input type="text" id="token" placeholder="EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v">
+                </div>
+                <div class="form-group">
+                    <label>Max Depth</label>
+                    <select id="depth">
+                        <option value="2">2 hops</option>
+                        <option value="3" selected>3 hops</option>
+                        <option value="4">4 hops</option>
+                        <option value="5">5 hops</option>
+                    </select>
+                </div>
+            </div>
+            <button onclick="trackTokens()" id="trackBtn" style="margin-top: 24px; width: 100%;">Start Tracing</button>
+            <div id="error"></div>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Following the token trail...</p>
+            <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 8px;">This may take a moment depending on depth</p>
+        </div>
+
+        <div class="results" id="results">
+            <div class="stats-bar" id="stats"></div>
+            
+            <div class="card">
+                <h3 style="margin-bottom: 20px; font-size: 1.1rem;">Token Flow Tree</h3>
+                <div class="flow-tree">
+                    <div class="flow-header">
+                        <span>Hop</span>
+                        <span>From</span>
+                        <span>To</span>
+                        <span>Amount</span>
+                        <span>Tx</span>
+                    </div>
+                    <div id="flowsBody"></div>
+                </div>
+                <a href="#" class="download-btn" onclick="downloadCSV(); return false;">
+                    ⬇ Download CSV
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentData = [];
+
+        async function trackTokens() {
+            const wallet = document.getElementById('wallet').value.trim();
+            const token = document.getElementById('token').value.trim();
+            const depth = document.getElementById('depth').value;
+            const btn = document.getElementById('trackBtn');
+            const loading = document.getElementById('loading');
+            const results = document.getElementById('results');
+            const error = document.getElementById('error');
+
+            if (!wallet || !token) {
+                error.innerHTML = '<div class="error">Please enter both wallet and token mint</div>';
+                return;
+            }
+
+            btn.disabled = true;
+            loading.classList.add('active');
+            results.classList.remove('active');
+            error.innerHTML = '';
+
+            try {
+                const response = await fetch('/api/track', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ wallet, token, maxDepth: parseInt(depth) })
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    error.innerHTML = `<div class="error">${data.error}</div>`;
+                    return;
+                }
+
+                currentData = data.flows || [];
+                displayResults(data);
+
+            } catch (err) {
+                error.innerHTML = `<div class="error">Failed to trace: ${err.message}</div>`;
+            } finally {
+                btn.disabled = false;
+                loading.classList.remove('active');
+            }
+        }
+
+        function displayResults(data) {
+            const flows = data.flows || [];
+            const summary = data.summary || {};
+            const stats = document.getElementById('stats');
+            const tbody = document.getElementById('flowsBody');
+            const results = document.getElementById('results');
+
+            // Stats
+            stats.innerHTML = `
+                <div class="stat">
+                    <div class="stat-value">${flows.length}</div>
+                    <div class="stat-label">Transfers</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">${summary.unique_wallets || 0}</div>
+                    <div class="stat-label">Wallets</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">${(summary.total_amount || 0).toFixed(2)}</div>
+                    <div class="stat-label">${summary.token_symbol || 'Tokens'}</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">${summary.max_depth || 0}</div>
+                    <div class="stat-label">Depth</div>
+                </div>
+            `;
+
+            // Flow rows
+            if (flows.length === 0) {
+                tbody.innerHTML = `
+                    <div class="empty-state">
+                        <p>No token flows found from this wallet</p>
+                    </div>
+                `;
+            } else {
+                tbody.innerHTML = flows.map(f => `
+                    <div class="flow-row">
+                        <span data-label="Hop"><span class="depth-badge depth-${f.depth}">${f.depth}</span></span>
+                        <span class="wallet" data-label="From">
+                            <a href="https://solscan.io/account/${f.from_wallet}" target="_blank">${f.from_wallet.slice(0, 20)}...${f.from_wallet.slice(-4)}</a>
+                        </span>
+                        <span class="wallet" data-label="To">
+                            <a href="https://solscan.io/account/${f.to_wallet}" target="_blank">${f.to_wallet.slice(0, 20)}...${f.to_wallet.slice(-4)}</a>
+                        </span>
+                        <span class="amount" data-label="Amount">${f.amount.toFixed(4)}</span>
+                        <span data-label="Tx"><a href="https://solscan.io/tx/${f.signature}" target="_blank" class="tx-link">View →</a></span>
+                    </div>
+                `).join('');
+            }
+
+            results.classList.add('active');
+        }
+
+        function downloadCSV() {
+            if (!currentData.length) return;
+
+            const headers = Object.keys(currentData[0]);
+            const csv = [
+                headers.join(','),
+                ...currentData.map(row => headers.map(h => {
+                    const val = row[h] ?? '';
+                    return `"${String(val).replace(/"/g, '""')}"`;
+                }).join(','))
+            ].join('\n');
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `constable_${new Date().toISOString().slice(0,10)}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
