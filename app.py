@@ -111,6 +111,12 @@ def fetch_transactions_batch(signatures: List[str]) -> List[Optional[Dict]]:
     try:
         response = requests.post(HELIUS_RPC, json=batch, timeout=30)
         results = response.json()
+        # Handle both list (batch response) and dict (error response)
+        if isinstance(results, dict):
+            if results.get("error"):
+                log(f"RPC error: {results['error']}")
+                return []
+            return [results.get("result")]
         return [r.get("result") for r in results if r.get("result")]
     except Exception as e:
         log(f"Batch fetch error: {e}")
@@ -180,7 +186,9 @@ def parse_flows_from_transactions(
                             break
                     
                     if post_amt_new > pre_amt_old:
-                        to_wallet = account_keys[post_idx].get("pubkey")
+                        to_wallet = account_keys[post_idx]
+                        if isinstance(to_wallet, dict):
+                            to_wallet = to_wallet.get("pubkey", "")
                         if to_wallet and to_wallet != source_wallet:
                             flows.append({
                                 "from": source_wallet,
