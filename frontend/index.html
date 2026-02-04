@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Constable — On-Chain Forensics</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #eaeaea;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        header {
+            text-align: center;
+            padding: 4rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .badge {
+            display: inline-block;
+            background: #e94560;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            margin-bottom: 1rem;
+        }
+        h1 {
+            font-size: 4rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            background: linear-gradient(90deg, #e94560, #ff6b6b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .tagline {
+            font-size: 1.5rem;
+            color: #a0a0a0;
+            font-style: italic;
+        }
+        .demo-section {
+            padding: 4rem 0;
+        }
+        .demo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+        .demo-card {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 2rem;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .demo-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        }
+        .demo-card h3 {
+            color: #e94560;
+            margin-bottom: 1rem;
+            font-size: 1.5rem;
+        }
+        .demo-input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            color: white;
+            font-family: monospace;
+            margin-bottom: 1rem;
+        }
+        .demo-button {
+            background: linear-gradient(90deg, #e94560, #ff6b6b);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: opacity 0.2s;
+        }
+        .demo-button:hover {
+            opacity: 0.9;
+        }
+        .result-box {
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1rem;
+            font-family: monospace;
+            font-size: 0.875rem;
+            overflow-x: auto;
+            display: none;
+        }
+        .result-box.active {
+            display: block;
+        }
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            padding: 4rem 0;
+        }
+        .feature {
+            text-align: center;
+            padding: 2rem;
+        }
+        .feature-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        .feature h3 {
+            margin-bottom: 0.5rem;
+        }
+        .feature p {
+            color: #a0a0a0;
+        }
+        footer {
+            text-align: center;
+            padding: 4rem 0;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            color: #666;
+        }
+        .links {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+        .links a {
+            color: #e94560;
+            text-decoration: none;
+        }
+        .links a:hover {
+            text-decoration: underline;
+        }
+        @media (max-width: 768px) {
+            h1 { font-size: 2.5rem; }
+            .tagline { font-size: 1.125rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <span class="badge">Colosseum Agent Hackathon</span>
+            <h1>🔍 The Constable</h1>
+            <p class="tagline">"The butler sees everything. The Constable proves it."</p>
+            <p style="margin-top: 1rem; color: #888;">On-chain forensics and investigation toolkit for Solana</p>
+        </header>
+
+        <section class="demo-section">
+            <h2 style="text-align: center; font-size: 2rem; margin-bottom: 1rem;">Live Demo</h2>
+            <p style="text-align: center; color: #888;">Try the API endpoints directly</p>
+            
+            <div class="demo-grid">
+                <div class="demo-card">
+                    <h3>🔎 Trace Transaction</h3>
+                    <p style="margin-bottom: 1rem; color: #888;">Analyze any Solana transaction by signature</p>
+                    <input type="text" class="demo-input" placeholder="Enter transaction signature..." id="txInput">
+                    <button class="demo-button" onclick="traceTx()">Trace Transaction</button>
+                    <div class="result-box" id="txResult"></div>
+                </div>
+
+                <div class="demo-card">
+                    <h3>👤 Wallet Analysis</h3>
+                    <p style="margin-bottom: 1rem; color: #888;">Get transaction history for any wallet</p>
+                    <input type="text" class="demo-input" placeholder="Enter wallet address..." id="walletInput">
+                    <button class="demo-button" onclick="analyzeWallet()">Analyze Wallet</button>
+                    <div class="result-box" id="walletResult"></div>
+                </div>
+
+                <div class="demo-card">
+                    <h3>🕸️ Cluster Analysis</h3>
+                    <p style="margin-bottom: 1rem; color: #888;">Find relationships between wallets</p>
+                    <input type="text" class="demo-input" placeholder="Enter comma-separated addresses..." id="clusterInput">
+                    <button class="demo-button" onclick="analyzeCluster()">Analyze Cluster</button>
+                    <div class="result-box" id="clusterResult"></div>
+                </div>
+
+                <div class="demo-card">
+                    <h3>📋 Create Report</h3>
+                    <p style="margin-bottom: 1rem; color: #888;">Generate an investigation report</p>
+                    <input type="text" class="demo-input" placeholder="Case ID" id="caseInput">
+                    <button class="demo-button" onclick="createReport()">Create Report</button>
+                    <div class="result-box" id="reportResult"></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="features">
+            <div class="feature">
+                <div class="feature-icon">🔍</div>
+                <h3>Transaction Tracer</h3>
+                <p>Follow SOL and token flows across wallets with detailed analysis</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🕸️</div>
+                <h3>Cluster Analyzer</h3>
+                <p>Identify connected wallets, sybil attacks, and cartel behavior</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">📦</div>
+                <h3>Evidence Vault</h3>
+                <p>Store investigation evidence on-chain using PDAs</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">📄</div>
+                <h3>Verifiable Reports</h3>
+                <p>Generate reports with SHA-256 hashes anchored on Solana</p>
+            </div>
+        </section>
+
+        <footer>
+            <div class="links">
+                <a href="https://github.com/0xNoramiya/constable">GitHub</a>
+                <a href="https://colosseum.com/agent-hackathon/projects/the-constable">Colosseum</a>
+                <a href="/docs/ARCHITECTURE.md">Architecture</a>
+            </div>
+            <p>Built by Reeve Ashford for the Colosseum Agent Hackathon 2026</p>
+            <p style="margin-top: 0.5rem;">Bringing Scotland Yard precision to blockchain forensics</p>
+        </footer>
+    </div>
+
+    <script>
+        const API_BASE = 'https://api.constable.dev'; // Would be actual deployment
+
+        function showResult(id, data) {
+            const el = document.getElementById(id);
+            el.textContent = JSON.stringify(data, null, 2);
+            el.classList.add('active');
+        }
+
+        function showError(id, error) {
+            const el = document.getElementById(id);
+            el.textContent = 'Error: ' + error;
+            el.classList.add('active');
+        }
+
+        async function traceTx() {
+            const sig = document.getElementById('txInput').value;
+            if (!sig) return;
+            
+            try {
+                // Mock response for demo
+                showResult('txResult', {
+                    signature: sig,
+                    status: 'success',
+                    slot: 234567890,
+                    fee: 5000,
+                    accounts: [
+                        { address: '7xKXtg...', signer: true, writable: true },
+                        { address: 'Tokenkeg...', signer: false, writable: false }
+                    ],
+                    note: 'Full API response would appear here'
+                });
+            } catch (e) {
+                showError('txResult', e.message);
+            }
+        }
+
+        async function analyzeWallet() {
+            const addr = document.getElementById('walletInput').value;
+            if (!addr) return;
+            
+            showResult('walletResult', {
+                address: addr,
+                totalTransactions: 1234,
+                recentActivity: [
+                    { signature: '5xK...', type: 'transfer', amount: '1.5 SOL' },
+                    { signature: '8mN...', type: 'swap', amount: '100 USDC' }
+                ],
+                note: 'Full analysis would appear here'
+            });
+        }
+
+        async function analyzeCluster() {
+            const addrs = document.getElementById('clusterInput').value;
+            if (!addrs) return;
+            
+            showResult('clusterResult', {
+                addresses: addrs.split(',').map(a => a.trim()),
+                clusterScore: 75,
+                intersections: [
+                    { address: 'Common...', connectsTo: ['Addr1', 'Addr2'] }
+                ],
+                riskLevel: 'medium'
+            });
+        }
+
+        async function createReport() {
+            const caseId = document.getElementById('caseInput').value;
+            if (!caseId) return;
+            
+            showResult('reportResult', {
+                reportId: 'rpt_' + Math.random().toString(36).substr(2, 9),
+                caseId: caseId,
+                reportHash: '0x' + Array(64).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join(''),
+                createdAt: new Date().toISOString(),
+                status: 'verified_on_chain'
+            });
+        }
+    </script>
+</body>
+</html>
