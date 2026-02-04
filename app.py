@@ -10,7 +10,7 @@ from typing import List, Dict, Optional, Set
 from dataclasses import dataclass, asdict
 from datetime import datetime
 
-HELIUS_API_KEY = "YOUR_OLD_HELIUS_API_KEY_HERE"
+HELIUS_API_KEY = "YOUR_HELIUS_API_KEY_HERE"
 HELIUS_RPC = f"https://mainnet.helius-rpc.com/?api-key={HELIUS_API_KEY}"
 
 
