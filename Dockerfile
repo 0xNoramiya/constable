@@ -13,4 +13,4 @@ COPY . .
 EXPOSE 5000
 
 # Run with gunicorn for production
-CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "app:app"]
+CMD ["gunicorn", "-w", "2", "-b", "0.0.0.0:5000", "--timeout", "120", "--keep-alive", "5", "app:app"]

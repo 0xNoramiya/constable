@@ -391,10 +391,9 @@
                 <div class="form-group">
                     <label>Max Depth</label>
                     <select id="depth">
-                        <option value="2">2 hops</option>
-                        <option value="3" selected>3 hops</option>
+                        <option value="2" selected>2 hops</option>
+                        <option value="3">3 hops</option>
                         <option value="4">4 hops</option>
-                        <option value="5">5 hops</option>
                     </select>
                 </div>
             </div>
@@ -453,11 +452,23 @@
             error.innerHTML = '';
 
             try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 110000); // 110s timeout
+                
                 const response = await fetch('/api/track', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ wallet, token, maxDepth: parseInt(depth) })
+                    body: JSON.stringify({ wallet, token, maxDepth: parseInt(depth) }),
+                    signal: controller.signal
                 });
+                clearTimeout(timeoutId);
+
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    const text = await response.text();
+                    console.error('Non-JSON response:', text.substring(0, 200));
+                    throw new Error('Server returned non-JSON response. The request may have timed out.');
+                }
 
                 const data = await response.json();
 
@@ -470,7 +481,11 @@
                 displayResults(data);
 
             } catch (err) {
-                error.innerHTML = `<div class="error">Failed to trace: ${err.message}</div>`;
+                if (err.name === 'AbortError') {
+                    error.innerHTML = '<div class="error">Request timed out. Try reducing the depth (2-3 hops) or try again later.</div>';
+                } else {
+                    error.innerHTML = `<div class="error">Failed to trace: ${err.message}</div>`;
+                }
             } finally {
                 btn.disabled = false;
                 loading.classList.remove('active');

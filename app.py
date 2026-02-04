@@ -193,7 +193,7 @@ def track_token_recursive(
     start_wallet: str,
     token_mint: str,
     max_depth: int = 3,
-    max_tx_per_level: int = 50,
+    max_tx_per_level: int = 20,  # Reduced from 50
     visited_wallets: Optional[Set[str]] = None,
     current_depth: int = 0
 ) -> List[TokenFlow]:
@@ -394,7 +394,10 @@ def serve_index():
 @app.route('/api/track', methods=['POST'])
 def api_track():
     """API endpoint for recursive token tracking."""
-    data = request.json
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Invalid JSON body"}), 400
+        
     wallet = data.get('wallet', '').strip()
     token = data.get('token', '').strip()
     max_depth = min(data.get('maxDepth', 3), 5)  # Cap at 5 for safety
@@ -403,8 +406,8 @@ def api_track():
         return jsonify({"error": "Wallet and token mint required"}), 400
     
     try:
-        print(f"🎯 Starting trace: {wallet} → {token}")
-        flows = track_token_recursive(wallet, token, max_depth=max_depth)
+        print(f"🎯 Starting trace: {wallet[:20]}... → {token[:20]}...")
+        flows = track_token_recursive(wallet, token, max_depth=max_depth, max_tx_per_level=20)
         summary = summarize_flows(flows)
         
         return jsonify({
@@ -414,7 +417,13 @@ def api_track():
             "token_mint": token
         })
         
+    except requests.exceptions.Timeout:
+        return jsonify({"error": "Request timed out. Try reducing depth or try again later."}), 504
+    except requests.exceptions.RequestException as e:
+        return jsonify({"error": f"API request failed: {str(e)}"}), 502
     except Exception as e:
+        import traceback
+        print(f"Error in api_track: {traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
 
 
