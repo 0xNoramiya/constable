@@ -1,6 +1,8 @@
-# 🎩 Constable
+# 🎩 The Constable
 
-Recursive token tracking for Solana. Follow where your tokens go.
+> On-chain forensics and investigation toolkit for Solana. Scotland Yard precision meets blockchain investigation.
+
+Recursive token tracking that follows your tokens through every hop — from wallet to wallet, across DEXs, through mixers. Complete visibility for investigators, auditors, and the curious.
 
 ## What It Does
 
